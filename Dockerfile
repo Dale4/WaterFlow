@@ -11,6 +11,6 @@ RUN dotnet publish -c Release -o /app/publish --no-restore
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 EXPOSE 8080
+COPY --from=build --chown=$APP_UID:$APP_UID /app/publish .
 USER $APP_UID
-COPY --from=build /app/publish .
 ENTRYPOINT ["dotnet", "WaterFlow.Api.dll"]
