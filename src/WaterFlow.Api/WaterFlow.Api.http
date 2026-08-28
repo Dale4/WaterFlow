@@ -1,6 +1,19 @@
-@WaterFlow.Api_HostAddress = http://localhost:5094
+@WaterFlow.Api_HostAddress = http://localhost:5080
 
-GET {{WaterFlow.Api_HostAddress}}/weatherforecast/
+GET {{WaterFlow.Api_HostAddress}}/
+Accept: application/json
+
+###
+
+GET {{WaterFlow.Api_HostAddress}}/hello
+
+###
+
+GET {{WaterFlow.Api_HostAddress}}/health
+
+###
+
+GET {{WaterFlow.Api_HostAddress}}/openapi/v1.json
 Accept: application/json
 
 ###
