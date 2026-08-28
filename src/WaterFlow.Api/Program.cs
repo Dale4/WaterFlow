@@ -7,11 +7,6 @@ var app = builder.Build();
 
 app.MapOpenApi();
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseHttpsRedirection();
-}
-
 app.MapGet("/", () => Results.Ok(new { service = "WaterFlow", status = "running" }));
 
 app.MapGet("/hello", () => "Hello from WaterFlow");
