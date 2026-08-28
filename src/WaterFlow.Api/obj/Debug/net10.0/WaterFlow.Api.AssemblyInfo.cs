@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("WaterFlow.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+d6d651184e2a00de2bfea543f5d9b3017675974a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+16605a3822fe8081c504866f95a6a21664260aa0")]
 [assembly: System.Reflection.AssemblyProductAttribute("WaterFlow.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("WaterFlow.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
