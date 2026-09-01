@@ -26,6 +26,14 @@ curl http://localhost:5080/hello
 curl http://localhost:5080/health
 ```
 
+## Tests
+
+```bash
+dotnet test WaterFlow.slnx
+```
+
+See [docs/testing.md](docs/testing.md) for the unit vs integration split and what each test covers.
+
 ## Docker
 
 Build and run the image:

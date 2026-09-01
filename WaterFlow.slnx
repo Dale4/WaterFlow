@@ -7,4 +7,7 @@
   <Folder Name="/src/">
     <Project Path="src/WaterFlow.Api/WaterFlow.Api.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WaterFlow.Api.Tests/WaterFlow.Api.Tests.csproj" />
+  </Folder>
 </Solution>

@@ -1,3 +1,5 @@
+using WaterFlow.Api;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
@@ -7,10 +9,12 @@ var app = builder.Build();
 
 app.MapOpenApi();
 
-app.MapGet("/", () => Results.Ok(new { service = "WaterFlow", status = "running" }));
+app.MapGet("/", () => Results.Ok(WaterFlowEndpoints.GetStatus()));
 
-app.MapGet("/hello", () => "Hello from WaterFlow");
+app.MapGet("/hello", WaterFlowEndpoints.GetHello);
 
 app.MapHealthChecks("/health");
 
 app.Run();
+
+public partial class Program { }
