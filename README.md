@@ -52,10 +52,12 @@ curl http://localhost:8080/health
 
 ## CI / ECR
 
-GitHub Actions runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) on pull requests, merges to `main`, and manual `workflow_dispatch`.
+GitHub Actions runs [`.github/workflows/build-and-push-ecr.yml`](.github/workflows/build-and-push-ecr.yml) on pull requests, merges to `main`, and manual `workflow_dispatch`.
 
-- **Pull requests:** `dotnet test WaterFlow.slnx --configuration Release`
-- **Merge to `main` (and manual runs on `main`):** the same tests, then a `linux/amd64` image is built and pushed to ECR
+The pipeline always **builds**, then **tests**. The image is pushed only if both succeed.
+
+- **Pull requests:** `dotnet build` then `dotnet test --no-build`
+- **Merge to `main` (and manual runs on `main`):** the same build and test, then a `linux/amd64` image is pushed to ECR
 
 Image:
 

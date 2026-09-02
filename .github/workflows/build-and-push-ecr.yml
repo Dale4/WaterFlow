@@ -1,4 +1,4 @@
-name: CI
+name: Build and push ECR
 
 on:
   push:
@@ -9,28 +9,33 @@ on:
 permissions:
   contents: read
 
+env:
+  ECR_REPOSITORY: waterflow/dataservices
+  DOTNET_VERSION: 10.0.x
+
 jobs:
-  test:
+  build-and-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: "10.0.x"
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Run tests
-        run: dotnet test WaterFlow.slnx --configuration Release
+      - name: Build
+        run: dotnet build WaterFlow.slnx --configuration Release
+
+      - name: Test
+        run: dotnet test WaterFlow.slnx --configuration Release --no-build
 
   publish-image:
-    needs: test
+    needs: build-and-test
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
-    env:
-      ECR_REPOSITORY: waterflow/dataservices
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +44,7 @@ jobs:
           TOKEN=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
             "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com")
           echo "$TOKEN" | jq -r .value | cut -d. -f2 | tr '_-' '/+' | base64 -d 2>/dev/null | jq .
-      
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
