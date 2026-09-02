@@ -49,3 +49,26 @@ Then:
 curl http://localhost:8080/hello
 curl http://localhost:8080/health
 ```
+
+## CI / ECR
+
+GitHub Actions runs [`.github/workflows/ci.yml`](.github/workflows/ci.yml) on pull requests, merges to `main`, and manual `workflow_dispatch`.
+
+- **Pull requests:** `dotnet test WaterFlow.slnx --configuration Release`
+- **Merge to `main` (and manual runs on `main`):** the same tests, then a `linux/amd64` image is built and pushed to ECR
+
+Image:
+
+`{AWS_ACCOUNT_ID}.dkr.ecr.{AWS_REGION}.amazonaws.com/waterflow/dataservices`
+
+Tags: git SHA and `latest`.
+
+Set these repository variables under **Settings → Secrets and variables → Actions → Variables** before the first push to ECR:
+
+| Variable | Purpose |
+| --- | --- |
+| `AWS_ROLE_ARN` | IAM role trusted by GitHub OIDC for this repo |
+| `AWS_REGION` | Region of the ECR repository |
+| `AWS_ACCOUNT_ID` | Account ID used to form the ECR registry URL |
+
+The role must allow ECR push to `waterflow/dataservices` (`ecr:GetAuthorizationToken` plus `PutImage` and layer-upload actions on that repository).
