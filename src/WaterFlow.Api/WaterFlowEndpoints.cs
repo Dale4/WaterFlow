@@ -7,4 +7,6 @@ public static class WaterFlowEndpoints
     public static ServiceStatusResponse GetStatus() => new("WaterFlow", "running");
 
     public static string GetHello() => "Hello from WaterFlow";
+
+    public static string GetHello2() => "Hello from WaterFlow 2";
 }
