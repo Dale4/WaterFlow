@@ -50,34 +50,40 @@ curl http://localhost:8080/hello
 curl http://localhost:8080/health
 ```
 
-## CI / ECR / Fargate
+## CI / ECR
 
 GitHub Actions runs [`.github/workflows/build-and-push-ecr.yml`](.github/workflows/build-and-push-ecr.yml) on pull requests, merges to `main`, and manual `workflow_dispatch`.
 
-The pipeline always **builds**, then **tests**. The image is pushed and deployed only if both succeed.
+The pipeline always **builds**, then **tests**. The image is pushed only if both succeed.
 
 - **Pull requests:** `dotnet build` then `dotnet test --no-build`
-- **Merge to `main` (and manual runs on `main`):** the same build and test, then a `linux/amd64` image is pushed to ECR and the Fargate service is updated to that image
+- **Merge to `main` (and manual runs on `main`):** the same build and test, then a `linux/amd64` image is pushed to ECR
 
 Image:
 
 `{AWS_ACCOUNT_ID}.dkr.ecr.{AWS_REGION}.amazonaws.com/waterflow/dataservices`
 
-Tags: git SHA and `latest`. The running Fargate task uses the SHA tag. Each deploy registers a new revision of the existing task definition family (same CPU, memory, env, and roles; new image URI).
+Tags: git SHA and `latest`.
 
-Set these repository variables under **Settings → Secrets and variables → Actions → Variables**:
+Set these repository variables under **Settings → Secrets and variables → Actions → Variables** before the first push to ECR:
 
 | Variable | Purpose |
 | --- | --- |
 | `AWS_ROLE_ARN` | IAM role trusted by GitHub OIDC for this repo |
-| `AWS_REGION` | Region of the ECR repository and ECS cluster |
+| `AWS_REGION` | Region of the ECR repository |
 | `AWS_ACCOUNT_ID` | Account ID used to form the ECR registry URL |
-| `ECS_CLUSTER` | ECS cluster that runs the Fargate service |
-| `ECS_SERVICE` | Fargate service name |
-| `ECS_CONTAINER_NAME` | Container name inside the task definition (must match exactly) |
 
-The role must allow:
+The role must allow ECR push to `waterflow/dataservices` (`ecr:GetAuthorizationToken` plus `PutImage` and layer-upload actions on that repository). GitHub does not update Fargate.
 
-- ECR push to `waterflow/dataservices` (`ecr:GetAuthorizationToken` plus `PutImage` and layer-upload actions on that repository)
-- ECS deploy: `ecs:DescribeServices`, `ecs:DescribeTaskDefinition`, `ecs:RegisterTaskDefinition`, `ecs:UpdateService`
-- `iam:PassRole` on the task role and task-execution role attached to that task definition
+## Deploy to Fargate
+
+After the image is in ECR, and after the app-platform env exists, point the service at `:latest`:
+
+```powershell
+.\scripts\deploy-to-fargate.ps1
+.\scripts\deploy-to-fargate.ps1 -Env test
+```
+
+Run this with your AWS CLI user (not GitHub). Use it when a new image has been pushed, and again after you destroy and recreate the env (CDK comes up on nginx until this script runs).
+
+Requires AWS CLI credentials that can describe/update the ECS service, register a task definition, `iam:PassRole` the task roles, and attach `AmazonECSTaskExecutionRolePolicy` to the task execution role (so Fargate can pull from private ECR).
