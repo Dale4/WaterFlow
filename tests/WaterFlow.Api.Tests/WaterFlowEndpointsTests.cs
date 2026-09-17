@@ -16,4 +16,10 @@ public class WaterFlowEndpointsTests
     {
         Assert.Equal("Hello from WaterFlow", WaterFlowEndpoints.GetHello());
     }
+
+    [Fact]
+    public void GetHello2_ReturnsGreeting()
+    {
+        Assert.Equal("Hello from WaterFlow 2", WaterFlowEndpoints.GetHello2());
+    }
 }

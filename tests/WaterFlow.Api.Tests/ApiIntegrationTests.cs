@@ -37,6 +37,15 @@ public class ApiIntegrationTests : IClassFixture<WaterFlowApiFactory>
     }
 
     [Fact]
+    public async Task GetHello2_ReturnsGreeting()
+    {
+        var response = await _client.GetAsync("/hello2");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("Hello from WaterFlow 2", await response.Content.ReadAsStringAsync());
+    }
+
+    [Fact]
     public async Task GetHealth_ReturnsHealthy()
     {
         var response = await _client.GetAsync("/health");
@@ -58,6 +67,7 @@ public class ApiIntegrationTests : IClassFixture<WaterFlowApiFactory>
         Assert.True(root.TryGetProperty("openapi", out _));
         Assert.True(root.TryGetProperty("paths", out var paths));
         Assert.True(paths.TryGetProperty("/hello", out _));
+        Assert.True(paths.TryGetProperty("/hello2", out _));
     }
 
     [Fact]

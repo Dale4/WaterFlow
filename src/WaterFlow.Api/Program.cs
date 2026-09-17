@@ -19,6 +19,8 @@ app.MapGet("/", () => Results.Ok(WaterFlowEndpoints.GetStatus()));
 
 app.MapGet("/hello", WaterFlowEndpoints.GetHello);
 
+app.MapGet("/hello2", WaterFlowEndpoints.GetHello2);
+
 app.MapHealthChecks("/health");
 
 app.Run();
