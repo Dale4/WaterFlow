@@ -8,6 +8,7 @@ ASP.NET Core 10 Minimal API scaffold, packaged as a Docker image.
 | --- | --- | --- |
 | GET | `/` | Service status JSON |
 | GET | `/hello` | Plain-text greeting |
+| GET | `/hello2` | Plain-text greeting (v2) |
 | GET | `/health` | Health check |
 | GET | `/openapi/v1.json` | OpenAPI document |
 
