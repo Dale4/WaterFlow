@@ -84,6 +84,17 @@ After the image is in ECR, and after the app-platform env exists, point the serv
 .\scripts\deploy-to-fargate.ps1 -Env test
 ```
 
+Dev API (HTTP, path prefix `/waterflow`):
+
+```powershell
+curl http://app-plat-dev-926912358.us-west-1.elb.amazonaws.com/waterflow/hello
+curl http://app-plat-dev-926912358.us-west-1.elb.amazonaws.com/waterflow/health
+```
+
+That URL works after an image that includes `UsePathBase` is pushed to ECR and this script has been run. The ALB only forwards `/waterflow/*`; without PathBase, `/waterflow/hello` is a 404 with an empty body.
+
 Run this with your AWS CLI user (not GitHub). Use it when a new image has been pushed, and again after you destroy and recreate the env (CDK comes up on nginx until this script runs).
+
+The script keeps the existing ALB target on port 80 (that cannot be changed on a live service) and runs the container as root so Kestrel can bind `:80`. The aspnet image otherwise exits with `Permission denied`.
 
 Requires AWS CLI credentials that can describe/update the ECS service, register a task definition, `iam:PassRole` the task roles, and attach `AmazonECSTaskExecutionRolePolicy` to the task execution role (so Fargate can pull from private ECR).

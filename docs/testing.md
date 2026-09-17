@@ -32,6 +32,7 @@ In VS Code / Cursor, run the `test` task from `.vscode/tasks.json`.
 
 - `GET /` → 200, `application/json`, `service` / `status` match
 - `GET /hello` → 200, body `Hello from WaterFlow`
+- With `ASPNETCORE_PATHBASE=/waterflow`, `GET /waterflow/hello` → 200 (ALB path)
 - `GET /health` → 200, body `Healthy`
 - `GET /openapi/v1.json` → 200, JSON with `openapi` and `/hello` in `paths`
 - `GET /missing` → 404

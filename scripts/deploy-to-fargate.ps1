@@ -41,11 +41,11 @@ function ConvertTo-PlainObject {
     }
 
     if ($Value -is [System.Collections.IEnumerable]) {
-        $list = New-Object System.Collections.ArrayList
+        $list = @()
         foreach ($item in $Value) {
-            [void]$list.Add((ConvertTo-PlainObject $item))
+            $list += ,(ConvertTo-PlainObject $item)
         }
-        return $list
+        return ,$list
     }
 
     if ($Value -is [psobject]) {
@@ -62,13 +62,31 @@ function ConvertTo-PlainObject {
     return $Value
 }
 
+function ConvertTo-ArrayList {
+    param($Value)
+
+    if ($null -eq $Value) {
+        return ,@()
+    }
+
+    if ($Value -is [string] -or $Value -isnot [System.Collections.IEnumerable]) {
+        return ,@($Value)
+    }
+
+    $list = @()
+    foreach ($item in $Value) {
+        $list += ,$item
+    }
+    return ,$list
+}
+
 function ConvertTo-EcsJson {
     param($TaskDefinition)
 
     $plain = ConvertTo-PlainObject $TaskDefinition
     foreach ($name in @("containerDefinitions", "requiresCompatibilities", "volumes", "placementConstraints")) {
         if ($plain.ContainsKey($name) -and $plain[$name] -isnot [System.Collections.IList]) {
-            $plain[$name] = New-Object System.Collections.ArrayList (, $plain[$name])
+            $plain[$name] = ConvertTo-ArrayList $plain[$name]
         }
     }
 
@@ -78,21 +96,18 @@ function ConvertTo-EcsJson {
         }
         foreach ($name in @("portMappings", "environment", "secrets", "mountPoints", "volumesFrom")) {
             if ($container.ContainsKey($name) -and $container[$name] -isnot [System.Collections.IList]) {
-                $container[$name] = New-Object System.Collections.ArrayList (, $container[$name])
+                $container[$name] = ConvertTo-ArrayList $container[$name]
             }
         }
     }
 
-    Add-Type -AssemblyName System.Web.Extensions
-    $serializer = New-Object System.Web.Script.Serialization.JavaScriptSerializer
-    $serializer.MaxJsonLength = [int]::MaxValue
-    return $serializer.Serialize($plain)
+    return ($plain | ConvertTo-Json -Depth 30 -Compress)
 }
 
 $cluster = "app-platform-$Env"
 $service = "app-platform-$Env-waterflow"
 
-Write-Host "Deploying $EcrRepository:$ImageTag to $cluster / $service ($Region)"
+Write-Host "Deploying ${EcrRepository}:$ImageTag to $cluster / $service ($Region)"
 
 $account = aws sts get-caller-identity --query Account --output text
 if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($account)) {
@@ -123,6 +138,8 @@ if (-not $container) {
 }
 
 $container.image = $image
+# The CDK service is registered on port 80 for nginx. The aspnet image cannot bind :80 as non-root.
+$container | Add-Member -NotePropertyName user -NotePropertyValue "0" -Force
 
 foreach ($name in @(
         "taskDefinitionArn",

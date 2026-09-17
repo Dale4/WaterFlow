@@ -7,6 +7,12 @@ builder.Services.AddHealthChecks();
 
 var app = builder.Build();
 
+var pathBase = app.Configuration["ASPNETCORE_PATHBASE"];
+if (!string.IsNullOrWhiteSpace(pathBase))
+{
+    app.UsePathBase(pathBase);
+}
+
 app.MapOpenApi();
 
 app.MapGet("/", () => Results.Ok(WaterFlowEndpoints.GetStatus()));
