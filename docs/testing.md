@@ -37,6 +37,16 @@ In VS Code / Cursor, run the `test` task from `.vscode/tasks.json`.
 - `GET /openapi/v1.json` → 200, JSON with `openapi` and `/hello` in `paths`
 - `GET /missing` → 404
 
+**Authentication** (`AuthIntegrationTests`)
+
+The host uses SQLite, not RDS. Identity and JWT settings are supplied by the test factory.
+
+- Successful login returns a JWT that `GET /auth/me` accepts for New Avenue
+- Wrong password returns `invalid_credentials`
+- Five failed logins lock the account
+- `GET /auth/me` without a token returns 401
+- A member of another tenant cannot log in as New Avenue or set a New Avenue user's password
+
 The integration class uses `IClassFixture<WaterFlowApiFactory>` so one test host is created per class.
 
 ## Adding tests

@@ -1,0 +1,98 @@
+@host = http://localhost:5080
+@tenantId = 3f1c8a2b-7d4e-4a6f-9b21-5c0e8d1a4f77
+@operatorEmail = add.daleoneill@gmail.com
+@operatorPassword = !Op2DBPassword
+@newUserPassword = Clerk-pass-1
+@resetUserPassword = Clerk-pass-2
+@changedUserPassword = Clerk-pass-3
+
+# Set operatorEmail and operatorPassword to Seed:OperatorEmail and Seed:OperatorPassword.
+# The API must already be running. Send these requests from top to bottom.
+# Each named request stores its response so the next request can use the token or user id.
+
+# @name login
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{operatorEmail}}",
+  "password": "{{operatorPassword}}",
+  "tenantId": "{{tenantId}}"
+}
+
+###
+
+GET {{host}}/auth/me
+Authorization: Bearer {{login.response.body.$.token}}
+
+###
+
+# @name createUser
+POST {{host}}/auth/users
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "email": "billing-{{$timestamp}}@example.com",
+  "password": "{{newUserPassword}}",
+  "role": "BillingClerk"
+}
+
+###
+
+POST {{host}}/auth/users/{{createUser.response.body.$.id}}/password
+Authorization: Bearer {{login.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "newPassword": "{{resetUserPassword}}"
+}
+
+###
+
+# @name userLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{createUser.response.body.$.email}}",
+  "password": "{{resetUserPassword}}",
+  "tenantId": "{{tenantId}}"
+}
+
+###
+
+POST {{host}}/auth/change-password
+Authorization: Bearer {{userLogin.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "currentPassword": "{{resetUserPassword}}",
+  "newPassword": "{{changedUserPassword}}"
+}
+
+###
+
+POST {{host}}/auth/forgot-password
+Content-Type: application/json
+
+{
+  "email": "{{operatorEmail}}"
+}
+
+###
+
+# forgot-password answers 204 and does not return a token.
+# Paste an Identity reset token into resetToken before sending this request.
+@resetToken = paste-reset-token
+
+POST {{host}}/auth/reset-password
+Content-Type: application/json
+
+{
+  "email": "{{operatorEmail}}",
+  "token": "{{resetToken}}",
+  "newPassword": "{{changedUserPassword}}"
+}
+
+###
