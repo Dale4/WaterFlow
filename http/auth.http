@@ -1,12 +1,13 @@
 @host = http://localhost:5080
 @tenantId = 3f1c8a2b-7d4e-4a6f-9b21-5c0e8d1a4f77
-@operatorEmail = add.daleoneill@gmail.com
-@operatorPassword = !Op2DBPassword
+@operatorEmail = {{$dotenv OPERATOR_EMAIL}}
+@operatorPassword = {{$dotenv OPERATOR_PASSWORD}}
 @newUserPassword = Clerk-pass-1
 @resetUserPassword = Clerk-pass-2
 @changedUserPassword = Clerk-pass-3
 
-# Set operatorEmail and operatorPassword to Seed:OperatorEmail and Seed:OperatorPassword.
+# Copy http/.env.example to http/.env. Set OPERATOR_EMAIL and OPERATOR_PASSWORD
+# to Seed:OperatorEmail and Seed:OperatorPassword. http/.env is gitignored.
 # The API must already be running. Send these requests from top to bottom.
 # Each named request stores its response so the next request can use the token or user id.
 
