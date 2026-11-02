@@ -1,14 +1,18 @@
 using System.Net;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Configuration;
 
 namespace WaterFlow.Api.Tests;
 
 public sealed class WaterFlowPathBaseApiFactory : WebApplicationFactory<Program>
 {
+    private readonly SqliteConnection _connection = SqliteTestHost.Open();
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        SqliteTestHost.Configure(builder, _connection);
         builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
@@ -16,6 +20,13 @@ public sealed class WaterFlowPathBaseApiFactory : WebApplicationFactory<Program>
                 ["ASPNETCORE_PATHBASE"] = "/waterflow"
             });
         });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        base.Dispose(disposing);
+        if (disposing)
+            _connection.Dispose();
     }
 }
 

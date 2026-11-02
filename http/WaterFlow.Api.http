@@ -1,0 +1,19 @@
+@host = http://localhost:5080
+
+GET {{host}}/
+Accept: application/json
+
+###
+
+GET {{host}}/hello
+
+###
+
+GET {{host}}/health
+
+###
+
+GET {{host}}/openapi/v1.json
+Accept: application/json
+
+###
