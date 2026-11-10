@@ -1,0 +1,25 @@
+# Dev load balancer. Replace this host after destroy-env and a new deploy.
+# The number in the name changes every time the environment is recreated.
+@host = http://app-plat-dev-1138993883.us-west-1.elb.amazonaws.com/waterflow
+
+GET {{host}}/
+Accept: application/json
+
+###
+
+GET {{host}}/hello
+
+###
+
+GET {{host}}/hello2
+
+###
+
+GET {{host}}/health
+
+###
+
+GET {{host}}/openapi/v1.json
+Accept: application/json
+
+###
