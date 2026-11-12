@@ -56,6 +56,8 @@ public static class AuthServiceCollectionExtensions
                 nameof(MemberRole.BillingClerk)));
             options.AddPolicy("TenantRead", policy =>
                 policy.RequireAuthenticatedUser().RequireClaim(AuthClaimTypes.TenantId));
+            options.AddPolicy("PlatformAdmin", policy =>
+                policy.RequireAuthenticatedUser().RequireClaim(AuthClaimTypes.PlatformRole, AuthClaimTypes.PlatformAdmin));
         });
 
         services.AddSingleton<JwtTokenService>();

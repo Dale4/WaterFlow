@@ -32,6 +32,7 @@ app.MapGet("/hello2", WaterFlowEndpoints.GetHello2);
 app.MapHealthChecks("/health");
 
 app.MapAuthEndpoints();
+app.MapTenantEndpoints();
 
 await DatabaseStartup.ApplyAsync(app);
 

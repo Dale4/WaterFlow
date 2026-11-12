@@ -12,8 +12,8 @@ using WaterFlow.Api.Data;
 namespace WaterFlow.Api.Data.Migrations
 {
     [DbContext(typeof(WaterFlowDbContext))]
-    [Migration("20261029182432_InitialIdentity")]
-    partial class InitialIdentity
+    [Migration("20261112045412_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -185,6 +185,16 @@ namespace WaterFlow.Api.Data.Migrations
                     b.ToTable("Memberships");
                 });
 
+            modelBuilder.Entity("WaterFlow.Api.Data.PlatformAdmin", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("text");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("PlatformAdmins");
+                });
+
             modelBuilder.Entity("WaterFlow.Api.Data.Tenant", b =>
                 {
                     b.Property<Guid>("Id")
@@ -197,14 +207,10 @@ namespace WaterFlow.Api.Data.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Tenants");
+                    b.HasIndex("Name")
+                        .IsUnique();
 
-                    b.HasData(
-                        new
-                        {
-                            Id = new Guid("3f1c8a2b-7d4e-4a6f-9b21-5c0e8d1a4f77"),
-                            Name = "New Avenue"
-                        });
+                    b.ToTable("Tenants");
                 });
 
             modelBuilder.Entity("WaterFlow.Api.Identity.ApplicationUser", b =>
@@ -337,6 +343,17 @@ namespace WaterFlow.Api.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+
+                    b.Navigation("User");
+                });
+
+            modelBuilder.Entity("WaterFlow.Api.Data.PlatformAdmin", b =>
+                {
+                    b.HasOne("WaterFlow.Api.Identity.ApplicationUser", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
                     b.Navigation("User");
                 });
