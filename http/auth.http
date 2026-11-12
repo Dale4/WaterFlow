@@ -1,24 +1,51 @@
 @host = http://localhost:5080
-@tenantId = 3f1c8a2b-7d4e-4a6f-9b21-5c0e8d1a4f77
-@operatorEmail = {{$dotenv OPERATOR_EMAIL}}
-@operatorPassword = {{$dotenv OPERATOR_PASSWORD}}
+@platformEmail = {{$dotenv OPERATOR_EMAIL}}
+@platformPassword = {{$dotenv OPERATOR_PASSWORD}}
+@tenantOperator = avenue-operator@example.com
+@tenantOperatorPassword = Avenue-pass-1
 @newUserPassword = Clerk-pass-1
 @resetUserPassword = Clerk-pass-2
 @changedUserPassword = Clerk-pass-3
 
 # Copy http/.env.example to http/.env. Set OPERATOR_EMAIL and OPERATOR_PASSWORD
-# to Seed:OperatorEmail and Seed:OperatorPassword. http/.env is gitignored.
-# The API must already be running. Send these requests from top to bottom.
+# to Seed:OperatorEmail and Seed:OperatorPassword. That account is the platform admin.
+# http/.env is gitignored. The API must already be running.
+# Send these requests from top to bottom.
 # Each named request stores its response so the next request can use the token or user id.
+# createTenant returns 409 if New Avenue already exists. Send it once per database.
+
+# @name platformLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{platformEmail}}",
+  "password": "{{platformPassword}}"
+}
+
+###
+
+# @name createTenant
+POST {{host}}/tenants
+Authorization: Bearer {{platformLogin.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "New Avenue",
+  "operatorUserName": "{{tenantOperator}}",
+  "operatorPassword": "{{tenantOperatorPassword}}"
+}
+
+###
 
 # @name login
 POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "{{operatorEmail}}",
-  "password": "{{operatorPassword}}",
-  "tenantId": "{{tenantId}}"
+  "email": "{{tenantOperator}}",
+  "password": "{{tenantOperatorPassword}}",
+  "tenantId": "{{createTenant.response.body.$.tenantId}}"
 }
 
 ###
@@ -58,7 +85,7 @@ Content-Type: application/json
 {
   "email": "{{createUser.response.body.$.email}}",
   "password": "{{resetUserPassword}}",
-  "tenantId": "{{tenantId}}"
+  "tenantId": "{{createTenant.response.body.$.tenantId}}"
 }
 
 ###
@@ -78,7 +105,7 @@ POST {{host}}/auth/forgot-password
 Content-Type: application/json
 
 {
-  "email": "{{operatorEmail}}"
+  "email": "{{tenantOperator}}"
 }
 
 ###
@@ -91,7 +118,7 @@ POST {{host}}/auth/reset-password
 Content-Type: application/json
 
 {
-  "email": "{{operatorEmail}}",
+  "email": "{{tenantOperator}}",
   "token": "{{resetToken}}",
   "newPassword": "{{changedUserPassword}}"
 }

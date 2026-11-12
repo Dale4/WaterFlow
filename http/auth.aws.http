@@ -1,26 +1,53 @@
 # Dev load balancer. Replace this host after destroy-env and a new deploy.
 # The number in the name changes every time the environment is recreated.
 @host = http://app-plat-dev-1138993883.us-west-1.elb.amazonaws.com/waterflow
-@tenantId = 3f1c8a2b-7d4e-4a6f-9b21-5c0e8d1a4f77
-@operatorEmail = {{$dotenv AWS_OPERATOR_EMAIL}}
-@operatorPassword = {{$dotenv AWS_OPERATOR_PASSWORD}}
+@platformEmail = {{$dotenv AWS_OPERATOR_EMAIL}}
+@platformPassword = {{$dotenv AWS_OPERATOR_PASSWORD}}
+@tenantOperator = avenue-operator@example.com
+@tenantOperatorPassword = Avenue-pass-1
 @newUserPassword = Clerk-pass-1
 @resetUserPassword = Clerk-pass-2
 @changedUserPassword = Clerk-pass-3
 
 # Set AWS_OPERATOR_EMAIL and AWS_OPERATOR_PASSWORD in http/.env.
 # They must match Seed__OperatorEmail and Seed__OperatorPassword on the Fargate task.
+# That account is the platform admin and has no tenant.
 # Send these requests from top to bottom.
 # Each named request stores its response so the next request can use the token or user id.
+# createTenant returns 409 if New Avenue already exists. Send it once per database.
+
+# @name platformLogin
+POST {{host}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{platformEmail}}",
+  "password": "{{platformPassword}}"
+}
+
+###
+
+# @name createTenant
+POST {{host}}/tenants
+Authorization: Bearer {{platformLogin.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "name": "New Avenue",
+  "operatorUserName": "{{tenantOperator}}",
+  "operatorPassword": "{{tenantOperatorPassword}}"
+}
+
+###
 
 # @name login
 POST {{host}}/auth/login
 Content-Type: application/json
 
 {
-  "email": "{{operatorEmail}}",
-  "password": "{{operatorPassword}}",
-  "tenantId": "{{tenantId}}"
+  "email": "{{tenantOperator}}",
+  "password": "{{tenantOperatorPassword}}",
+  "tenantId": "{{createTenant.response.body.$.tenantId}}"
 }
 
 ###
@@ -60,7 +87,7 @@ Content-Type: application/json
 {
   "email": "{{createUser.response.body.$.email}}",
   "password": "{{resetUserPassword}}",
-  "tenantId": "{{tenantId}}"
+  "tenantId": "{{createTenant.response.body.$.tenantId}}"
 }
 
 ###
@@ -80,7 +107,7 @@ POST {{host}}/auth/forgot-password
 Content-Type: application/json
 
 {
-  "email": "{{operatorEmail}}"
+  "email": "{{tenantOperator}}"
 }
 
 ###
@@ -93,7 +120,7 @@ POST {{host}}/auth/reset-password
 Content-Type: application/json
 
 {
-  "email": "{{operatorEmail}}",
+  "email": "{{tenantOperator}}",
   "token": "{{resetToken}}",
   "newPassword": "{{changedUserPassword}}"
 }

@@ -16,8 +16,8 @@ public static class AuthEndpoints
         group.MapPost("/login", Login);
         group.MapPost("/forgot-password", ForgotPassword);
         group.MapPost("/reset-password", ResetPassword);
-        group.MapGet("/me", Me).RequireAuthorization("TenantRead");
-        group.MapPost("/change-password", ChangePassword).RequireAuthorization("TenantRead");
+        group.MapGet("/me", Me).RequireAuthorization();
+        group.MapPost("/change-password", ChangePassword).RequireAuthorization();
         group.MapPost("/users", CreateUser).RequireAuthorization("Operator");
         group.MapPost("/users/{userId}/password", SetPassword).RequireAuthorization("Operator");
     }
@@ -46,19 +46,36 @@ public static class AuthEndpoints
             .Where(membership => membership.UserId == user.Id)
             .ToListAsync();
 
-        Membership? membership;
-        if (request.TenantId is Guid tenantId)
-            membership = memberships.SingleOrDefault(item => item.TenantId == tenantId);
-        else if (memberships.Count == 1)
-            membership = memberships[0];
-        else
-            return Results.Json(new ErrorResponse("tenant_required"), statusCode: StatusCodes.Status400BadRequest);
+        var isPlatformAdmin = await db.PlatformAdmins.AnyAsync(admin => admin.UserId == user.Id);
 
-        if (membership is null)
+        if (request.TenantId is Guid tenantId)
+        {
+            var membership = memberships.SingleOrDefault(item => item.TenantId == tenantId);
+            if (membership is null)
+                return Unauthorized("invalid_credentials");
+
+            return TenantLogin(tokens, user, membership);
+        }
+
+        if (isPlatformAdmin)
+        {
+            var (token, expiresAt) = tokens.CreatePlatform(user);
+            return Results.Ok(new LoginResponse(token, expiresAt, null, null, AuthClaimTypes.PlatformAdmin));
+        }
+
+        if (memberships.Count == 1)
+            return TenantLogin(tokens, user, memberships[0]);
+
+        if (memberships.Count == 0)
             return Unauthorized("invalid_credentials");
 
+        return Results.Json(new ErrorResponse("tenant_required"), statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    private static IResult TenantLogin(JwtTokenService tokens, ApplicationUser user, Membership membership)
+    {
         var (token, expiresAt) = tokens.Create(user, membership);
-        return Results.Ok(new LoginResponse(token, expiresAt, membership.TenantId, membership.Role.ToString()));
+        return Results.Ok(new LoginResponse(token, expiresAt, membership.TenantId, membership.Role.ToString(), null));
     }
 
     private static async Task<IResult> ForgotPassword(ForgotPasswordRequest request, UserManager<ApplicationUser> users)
@@ -91,11 +108,17 @@ public static class AuthEndpoints
         var userId = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
         var email = principal.FindFirst(JwtRegisteredClaimNames.Email)?.Value;
         var role = principal.FindFirst(AuthClaimTypes.Role)?.Value;
+        var platformRole = principal.FindFirst(AuthClaimTypes.PlatformRole)?.Value;
         if (!TryGetTenantId(principal, out var tenantId))
-            return Results.Unauthorized();
+        {
+            if (platformRole != AuthClaimTypes.PlatformAdmin)
+                return Results.Unauthorized();
+
+            return Results.Ok(new MeResponse(userId, email, null, null, null, platformRole));
+        }
 
         var tenant = await db.Tenants.SingleOrDefaultAsync(item => item.Id == tenantId);
-        return Results.Ok(new MeResponse(userId, email, tenantId, tenant?.Name, role));
+        return Results.Ok(new MeResponse(userId, email, tenantId, tenant?.Name, role, null));
     }
 
     private static async Task<IResult> ChangePassword(
@@ -198,11 +221,11 @@ public static class AuthEndpoints
 
 public sealed record LoginRequest(string Email, string Password, Guid? TenantId);
 
-public sealed record LoginResponse(string Token, DateTimeOffset ExpiresAt, Guid TenantId, string Role);
+public sealed record LoginResponse(string Token, DateTimeOffset ExpiresAt, Guid? TenantId, string? Role, string? PlatformRole);
 
 public sealed record ErrorResponse(string Error);
 
-public sealed record MeResponse(string? UserId, string? Email, Guid TenantId, string? TenantName, string? Role);
+public sealed record MeResponse(string? UserId, string? Email, Guid? TenantId, string? TenantName, string? Role, string? PlatformRole);
 
 public sealed record ChangePasswordRequest(string CurrentPassword, string NewPassword);
 

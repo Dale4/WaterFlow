@@ -18,14 +18,23 @@ public class WaterFlowDbContext : IdentityDbContext<ApplicationUser>
 
     public DbSet<Membership> Memberships => Set<Membership>();
 
+    public DbSet<PlatformAdmin> PlatformAdmins => Set<PlatformAdmin>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         base.OnModelCreating(builder);
 
-        builder.Entity<Tenant>().HasData(new Tenant
+        builder.Entity<Tenant>()
+            .HasIndex(tenant => tenant.Name)
+            .IsUnique();
+
+        builder.Entity<PlatformAdmin>(entity =>
         {
-            Id = TenantIds.NewAvenue,
-            Name = "New Avenue"
+            entity.HasKey(admin => admin.UserId);
+            entity.HasOne(admin => admin.User)
+                .WithMany()
+                .HasForeignKey(admin => admin.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<Membership>(entity =>

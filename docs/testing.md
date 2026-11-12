@@ -41,7 +41,10 @@ In VS Code / Cursor, run the `test` task from `.vscode/tasks.json`.
 
 The host uses SQLite, not RDS. Identity and JWT settings are supplied by the test factory.
 
-- Successful login returns a JWT that `GET /auth/me` accepts for New Avenue
+- Successful login returns a JWT that `GET /auth/me` accepts for that tenant
+- A platform admin who omits `tenantId` gets a platform token; sending `tenantId` returns that membership
+- `POST /tenants` creates a tenant whose operator can log in
+- `POST /tenants/{tenantId}/operators` adds another Operator, including an existing username without changing that password
 - Wrong password returns `invalid_credentials`
 - Five failed logins lock the account
 - `GET /auth/me` without a token returns 401

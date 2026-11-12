@@ -41,4 +41,25 @@ public sealed class JwtTokenService
 
         return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
     }
+
+    public (string Token, DateTimeOffset ExpiresAt) CreatePlatform(ApplicationUser user)
+    {
+        var expiresAt = DateTimeOffset.UtcNow.AddMinutes(LifetimeMinutes);
+        var credentials = new SigningCredentials(
+            new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_signingKey)),
+            SecurityAlgorithms.HmacSha256);
+        var token = new JwtSecurityToken(
+            issuer: _issuer,
+            audience: _audience,
+            claims:
+            [
+                new Claim(JwtRegisteredClaimNames.Sub, user.Id),
+                new Claim(JwtRegisteredClaimNames.Email, user.Email ?? ""),
+                new Claim(AuthClaimTypes.PlatformRole, AuthClaimTypes.PlatformAdmin)
+            ],
+            expires: expiresAt.UtcDateTime,
+            signingCredentials: credentials);
+
+        return (new JwtSecurityTokenHandler().WriteToken(token), expiresAt);
+    }
 }

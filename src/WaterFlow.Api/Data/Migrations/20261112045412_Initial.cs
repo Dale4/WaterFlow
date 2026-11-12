@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace WaterFlow.Api.Data.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialIdentity : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -170,6 +170,23 @@ namespace WaterFlow.Api.Data.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "PlatformAdmins",
+                columns: table => new
+                {
+                    UserId = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PlatformAdmins", x => x.UserId);
+                    table.ForeignKey(
+                        name: "FK_PlatformAdmins_AspNetUsers_UserId",
+                        column: x => x.UserId,
+                        principalTable: "AspNetUsers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "Memberships",
                 columns: table => new
                 {
@@ -194,11 +211,6 @@ namespace WaterFlow.Api.Data.Migrations
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
-
-            migrationBuilder.InsertData(
-                table: "Tenants",
-                columns: new[] { "Id", "Name" },
-                values: new object[] { new Guid("3f1c8a2b-7d4e-4a6f-9b21-5c0e8d1a4f77"), "New Avenue" });
 
             migrationBuilder.CreateIndex(
                 name: "IX_AspNetRoleClaims_RoleId",
@@ -247,6 +259,12 @@ namespace WaterFlow.Api.Data.Migrations
                 table: "Memberships",
                 columns: new[] { "UserId", "TenantId" },
                 unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_Tenants_Name",
+                table: "Tenants",
+                column: "Name",
+                unique: true);
         }
 
         /// <inheritdoc />
@@ -271,13 +289,16 @@ namespace WaterFlow.Api.Data.Migrations
                 name: "Memberships");
 
             migrationBuilder.DropTable(
+                name: "PlatformAdmins");
+
+            migrationBuilder.DropTable(
                 name: "AspNetRoles");
 
             migrationBuilder.DropTable(
-                name: "AspNetUsers");
+                name: "Tenants");
 
             migrationBuilder.DropTable(
-                name: "Tenants");
+                name: "AspNetUsers");
         }
     }
 }
