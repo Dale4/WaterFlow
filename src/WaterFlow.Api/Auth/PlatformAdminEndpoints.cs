@@ -48,6 +48,12 @@ public static class PlatformAdminEndpoints
         UserManager<ApplicationUser> users,
         WaterFlowDbContext db)
     {
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        // Lock every platform-admin row before deciding. A second delete waits,
+        // then sees the row the first delete already removed.
+        await db.Database.ExecuteSqlRawAsync("""UPDATE "PlatformAdmins" SET "UserId" = "UserId";""");
+
         var admins = await db.PlatformAdmins.ToListAsync();
         var admin = admins.SingleOrDefault(item => item.UserId == userId);
         if (admin is null)
@@ -66,6 +72,7 @@ public static class PlatformAdminEndpoints
                 await users.DeleteAsync(user);
         }
 
+        await transaction.CommitAsync();
         return Results.NoContent();
     }
 }
