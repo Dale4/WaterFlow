@@ -45,6 +45,9 @@ The host uses SQLite, not RDS. Identity and JWT settings are supplied by the tes
 - A platform admin who omits `tenantId` gets a platform token; sending `tenantId` returns that membership
 - `POST /tenants` creates a tenant whose operator can log in
 - `POST /tenants/{tenantId}/operators` adds another Operator, including an existing username without changing that password
+- `POST /platform-admins` adds another platform admin, including an existing username without changing that password
+- `DELETE /platform-admins/{userId}` removes that admin and refuses to remove the last one
+- The startup seed is created only when no platform admin exists. After it is deleted, a restart does not recreate it while another admin remains, and does recreate it when none remain
 - Wrong password returns `invalid_credentials`
 - Five failed logins lock the account
 - `GET /auth/me` without a token returns 401

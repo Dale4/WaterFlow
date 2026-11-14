@@ -33,6 +33,7 @@ app.MapHealthChecks("/health");
 
 app.MapAuthEndpoints();
 app.MapTenantEndpoints();
+app.MapPlatformAdminEndpoints();
 
 await DatabaseStartup.ApplyAsync(app);
 

@@ -8,6 +8,8 @@
 @newUserPassword = Clerk-pass-1
 @resetUserPassword = Clerk-pass-2
 @changedUserPassword = Clerk-pass-3
+@replacementAdmin = replacement-admin@example.com
+@replacementPassword = Replace-pass-1
 
 # Set AWS_OPERATOR_EMAIL and AWS_OPERATOR_PASSWORD in http/.env.
 # They must match Seed__OperatorEmail and Seed__OperatorPassword on the Fargate task.
@@ -15,6 +17,7 @@
 # Send these requests from top to bottom.
 # Each named request stores its response so the next request can use the token or user id.
 # createTenant returns 409 if New Avenue already exists. Send it once per database.
+# The platform-admin requests at the bottom retire the seed. Skip them until you mean to do that.
 
 # @name platformLogin
 POST {{host}}/auth/login
@@ -124,5 +127,31 @@ Content-Type: application/json
   "token": "{{resetToken}}",
   "newPassword": "{{changedUserPassword}}"
 }
+
+###
+
+# Retire the seed platform admin. Send platformLogin first, then these three.
+# A later startup does not recreate the seed while the replacement admin exists.
+
+# @name createPlatformAdmin
+POST {{host}}/platform-admins
+Authorization: Bearer {{platformLogin.response.body.$.token}}
+Content-Type: application/json
+
+{
+  "email": "{{replacementAdmin}}",
+  "password": "{{replacementPassword}}"
+}
+
+###
+
+# @name platformMe
+GET {{host}}/auth/me
+Authorization: Bearer {{platformLogin.response.body.$.token}}
+
+###
+
+DELETE {{host}}/platform-admins/{{platformMe.response.body.$.userId}}
+Authorization: Bearer {{platformLogin.response.body.$.token}}
 
 ###

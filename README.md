@@ -20,6 +20,8 @@ ASP.NET Core 10 Minimal API scaffold, packaged as a Docker image.
 | POST | `/auth/users/{userId}/password` | Tenant Operator sets a password for a user in their tenant |
 | POST | `/tenants` | Platform admin creates a tenant and its first Operator |
 | POST | `/tenants/{tenantId}/operators` | Platform admin adds an Operator to an existing tenant |
+| POST | `/platform-admins` | Platform admin creates another platform admin |
+| DELETE | `/platform-admins/{userId}` | Platform admin removes a platform admin |
 
 ## Authentication
 
@@ -53,7 +55,7 @@ dotnet user-secrets --project src/WaterFlow.Api set "Jwt:Issuer" "WaterFlow"
 dotnet user-secrets --project src/WaterFlow.Api set "Jwt:Audience" "WaterFlow"
 ```
 
-Optional platform admin, created on startup only when both values are set. This account has no tenant. On Fargate the same settings are `Seed__OperatorEmail` and `Seed__OperatorPassword`.
+Optional platform admin, created on startup when both values are set and no platform admin exists yet. This account has no tenant. On Fargate the same settings are `Seed__OperatorEmail` and `Seed__OperatorPassword`. Sign in as that account and call `POST /platform-admins` with the replacement email and password. Then `DELETE /platform-admins/{userId}` removes the seed. Startup does not put that seed back while another platform admin remains. Deleting the last platform admin returns 409. If every platform admin is removed, the next startup creates the seed again. An existing username that is not already a platform admin gets the role and keeps their current password. A removed admin who has no tenant membership is deleted. A removed admin who still belongs to a tenant keeps that membership.
 
 ```bash
 dotnet user-secrets --project src/WaterFlow.Api set "Seed:OperatorEmail" "admin@example.com"

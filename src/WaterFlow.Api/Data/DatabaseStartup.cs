@@ -32,6 +32,9 @@ public static class DatabaseStartup
 
     private static async Task SeedPlatformAdminAsync(IServiceProvider services, WaterFlowDbContext db)
     {
+        if (await db.PlatformAdmins.AnyAsync())
+            return;
+
         var configuration = services.GetRequiredService<IConfiguration>();
         var email = configuration["Seed:OperatorEmail"];
         var password = configuration["Seed:OperatorPassword"];
