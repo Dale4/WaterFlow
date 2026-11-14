@@ -240,6 +240,81 @@ public class AuthIntegrationTests : IClassFixture<WaterFlowApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, rejected.StatusCode);
     }
 
+    [Fact]
+    public async Task PlatformAdmin_CanAddAnother_AndCannotDeleteTheLast()
+    {
+        var adminEmail = $"keeper-{Guid.NewGuid():N}@example.com";
+        await CreatePlatformAdminAsync(adminEmail, Password);
+        var adminLogin = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(adminEmail, Password, null));
+        var admin = await adminLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(admin);
+
+        var createdEmail = $"added-{Guid.NewGuid():N}@example.com";
+        var create = await SendAsync(
+            HttpMethod.Post,
+            "/platform-admins",
+            admin.Token,
+            new CreatePlatformAdminRequest(createdEmail, Password));
+        Assert.Equal(HttpStatusCode.Created, create.StatusCode);
+        var created = await create.Content.ReadFromJsonAsync<CreatedPlatformAdminResponse>();
+        Assert.NotNull(created);
+
+        var createdLogin = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(createdEmail, Password, null));
+        var createdBody = await createdLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(createdBody);
+        Assert.Equal(AuthClaimTypes.PlatformAdmin, createdBody.PlatformRole);
+
+        var duplicate = await SendAsync(
+            HttpMethod.Post,
+            "/platform-admins",
+            admin.Token,
+            new CreatePlatformAdminRequest(createdEmail, "Different-pass-1"));
+        Assert.Equal(HttpStatusCode.Conflict, duplicate.StatusCode);
+        Assert.Equal("already_platform_admin", await ReadErrorAsync(duplicate));
+
+        var memberEmail = $"member-{Guid.NewGuid():N}@example.com";
+        var tenantId = Guid.NewGuid();
+        var memberId = await CreateUserAsync(memberEmail, Password, MemberRole.Operator, tenantId, $"Mutual {Guid.NewGuid():N}");
+        var promoted = await SendAsync(
+            HttpMethod.Post,
+            "/platform-admins",
+            admin.Token,
+            new CreatePlatformAdminRequest(memberEmail, "Different-pass-1"));
+        Assert.Equal(HttpStatusCode.Created, promoted.StatusCode);
+        var samePassword = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(memberEmail, Password, null));
+        var promotedBody = await samePassword.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(promotedBody);
+        Assert.Equal(AuthClaimTypes.PlatformAdmin, promotedBody.PlatformRole);
+
+        var asOperator = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(memberEmail, Password, tenantId));
+        var operatorBody = await asOperator.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(operatorBody);
+        var forbidden = await SendAsync(
+            HttpMethod.Post,
+            "/platform-admins",
+            operatorBody.Token,
+            new CreatePlatformAdminRequest($"nope-{Guid.NewGuid():N}@example.com", Password));
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+
+        var removedMember = await SendAsync(HttpMethod.Delete, $"/platform-admins/{memberId}", admin.Token);
+        Assert.Equal(HttpStatusCode.NoContent, removedMember.StatusCode);
+        var stillMember = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(memberEmail, Password, tenantId));
+        Assert.Equal(HttpStatusCode.OK, stillMember.StatusCode);
+        var noPlatform = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(memberEmail, Password, null));
+        var noPlatformBody = await noPlatform.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(noPlatformBody);
+        Assert.Null(noPlatformBody.PlatformRole);
+        Assert.Equal(tenantId, noPlatformBody.TenantId);
+
+        var missing = await SendAsync(HttpMethod.Delete, $"/platform-admins/{Guid.NewGuid()}", admin.Token);
+        Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+
+        var removed = await SendAsync(HttpMethod.Delete, $"/platform-admins/{created.UserId}", admin.Token);
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        var gone = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(createdEmail, Password, null));
+        Assert.Equal(HttpStatusCode.Unauthorized, gone.StatusCode);
+    }
+
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, string token, object? body = null)
     {
         var request = new HttpRequestMessage(method, path);
