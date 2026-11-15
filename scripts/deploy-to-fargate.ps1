@@ -8,7 +8,11 @@ param(
 
     [string]$EcrRepository = "waterflow/dataservices",
 
-    [string]$ImageTag = "latest"
+    [string]$ImageTag = "latest",
+
+    [string]$SeedOperatorEmail,
+
+    [string]$SeedOperatorPassword
 )
 
 $ErrorActionPreference = "Stop"
@@ -104,6 +108,58 @@ function ConvertTo-EcsJson {
     return ($plain | ConvertTo-Json -Depth 30 -Compress)
 }
 
+function Read-DotEnvValue {
+    param(
+        [string]$Path,
+        [string]$Name
+    )
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line -match '^\s*([^#=]+)=(.*)$' -and $Matches[1].Trim() -eq $Name) {
+            $raw = $Matches[2].Trim()
+            if ($raw.Length -ge 2 -and $raw.StartsWith('"') -and $raw.EndsWith('"')) {
+                return $raw.Substring(1, $raw.Length - 2)
+            }
+            return $raw
+        }
+    }
+
+    return $null
+}
+
+function Set-ContainerEnvironment {
+    param(
+        $Container,
+        [string]$Name,
+        [string]$Value
+    )
+
+    $kept = @()
+    foreach ($entry in @($Container.environment)) {
+        if ($null -eq $entry -or $entry.name -eq $Name) {
+            continue
+        }
+        $kept += $entry
+    }
+    $kept += [pscustomobject]@{ name = $Name; value = $Value }
+    $Container | Add-Member -NotePropertyName environment -NotePropertyValue @($kept) -Force
+}
+
+$dotenvPath = Join-Path (Split-Path $PSScriptRoot -Parent) "http\.env"
+if ([string]::IsNullOrWhiteSpace($SeedOperatorEmail)) {
+    $SeedOperatorEmail = Read-DotEnvValue -Path $dotenvPath -Name "AWS_OPERATOR_EMAIL"
+}
+if ([string]::IsNullOrWhiteSpace($SeedOperatorPassword)) {
+    $SeedOperatorPassword = Read-DotEnvValue -Path $dotenvPath -Name "AWS_OPERATOR_PASSWORD"
+}
+if ([string]::IsNullOrWhiteSpace($SeedOperatorEmail) -or [string]::IsNullOrWhiteSpace($SeedOperatorPassword)) {
+    throw "Seed operator email and password are required. Pass -SeedOperatorEmail and -SeedOperatorPassword, or set AWS_OPERATOR_EMAIL and AWS_OPERATOR_PASSWORD in http/.env."
+}
+
 $cluster = "app-platform-$Env"
 $service = "app-platform-$Env-waterflow"
 
@@ -140,6 +196,9 @@ if (-not $container) {
 $container.image = $image
 # The CDK service is registered on port 80 for nginx. The aspnet image cannot bind :80 as non-root.
 $container | Add-Member -NotePropertyName user -NotePropertyValue "0" -Force
+Set-ContainerEnvironment -Container $container -Name "Seed__OperatorEmail" -Value $SeedOperatorEmail
+Set-ContainerEnvironment -Container $container -Name "Seed__OperatorPassword" -Value $SeedOperatorPassword
+Write-Host "Setting Seed__OperatorEmail and Seed__OperatorPassword on the task"
 
 foreach ($name in @(
         "taskDefinitionArn",

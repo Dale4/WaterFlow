@@ -55,7 +55,7 @@ dotnet user-secrets --project src/WaterFlow.Api set "Jwt:Issuer" "WaterFlow"
 dotnet user-secrets --project src/WaterFlow.Api set "Jwt:Audience" "WaterFlow"
 ```
 
-Optional platform admin, created on startup when both values are set and no platform admin exists yet. This account has no tenant. On Fargate the same settings are `Seed__OperatorEmail` and `Seed__OperatorPassword`. Sign in as that account and call `POST /platform-admins` with the replacement email and password. Then `DELETE /platform-admins/{userId}` removes the seed. Startup does not put that seed back while another platform admin remains. Deleting the last platform admin returns 409. If every platform admin is removed, the next startup creates the seed again. An existing username that is not already a platform admin gets the role and keeps their current password. A removed admin who has no tenant membership is deleted. A removed admin who still belongs to a tenant keeps that membership.
+Optional platform admin, created on startup when both values are set and no platform admin exists yet. This account has no tenant. On Fargate the deploy script sets `Seed__OperatorEmail` and `Seed__OperatorPassword` from `-SeedOperatorEmail` and `-SeedOperatorPassword`, or from `AWS_OPERATOR_EMAIL` and `AWS_OPERATOR_PASSWORD` in `http/.env`. Sign in as that account and call `POST /platform-admins` with the replacement email and password. Then `DELETE /platform-admins/{userId}` removes the seed. Startup does not put that seed back while another platform admin remains. Deleting the last platform admin returns 409. If every platform admin is removed, the next startup creates the seed again. An existing username that is not already a platform admin gets the role and keeps their current password. A removed admin who has no tenant membership is deleted. A removed admin who still belongs to a tenant keeps that membership.
 
 ```bash
 dotnet user-secrets --project src/WaterFlow.Api set "Seed:OperatorEmail" "admin@example.com"
@@ -146,10 +146,10 @@ curl http://app-plat-dev-926912358.us-west-1.elb.amazonaws.com/waterflow/health
 
 That URL works after an image that includes `UsePathBase` is pushed to ECR and this script has been run. The ALB only forwards `/waterflow/*`; without PathBase, `/waterflow/hello` is a 404 with an empty body.
 
-Run this with your AWS CLI user (not GitHub). Use it when a new image has been pushed, and again after you destroy and recreate the env (CDK comes up on nginx until this script runs).
+Run this with your AWS CLI user (not GitHub). Use it when a new image has been pushed, and again after you destroy and recreate the env. CloudFormation comes up on nginx and does not set the platform seed. `.\scripts\deploy-to-fargate.ps1` registers a new task revision, writes `Seed__OperatorEmail` and `Seed__OperatorPassword`, and updates the service to that revision.
 
 The script keeps the existing ALB target on port 80 (that cannot be changed on a live service) and runs the container as root so Kestrel can bind `:80`. The aspnet image otherwise exits with `Permission denied`.
 
-Before deploying a build that includes login, add `JWT_SIGNING_KEY`, `JWT_ISSUER`, and `JWT_AUDIENCE` to the Fargate task definition. The deploy script keeps existing environment variables and only changes the image.
+Before deploying a build that includes login, add `JWT_SIGNING_KEY`, `JWT_ISSUER`, and `JWT_AUDIENCE` to the Fargate task definition. The deploy script keeps those values. It replaces only the image and the two seed variables.
 
 Requires AWS CLI credentials that can describe/update the ECS service, register a task definition, `iam:PassRole` the task roles, and attach `AmazonECSTaskExecutionRolePolicy` to the task execution role (so Fargate can pull from private ECR).
