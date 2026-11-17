@@ -9,8 +9,22 @@ public static class PlatformAdminEndpoints
 {
     public static void MapPlatformAdminEndpoints(this WebApplication app)
     {
+        app.MapGet("/platform-admins", List).RequireAuthorization("PlatformAdmin");
         app.MapPost("/platform-admins", Create).RequireAuthorization("PlatformAdmin");
+        app.MapPatch("/platform-admins/{userId}", Update).RequireAuthorization("PlatformAdmin");
         app.MapDelete("/platform-admins/{userId}", Delete).RequireAuthorization("PlatformAdmin");
+    }
+
+    private static async Task<IResult> List(WaterFlowDbContext db)
+    {
+        var rows = await (
+            from admin in db.PlatformAdmins
+            join user in db.Users on admin.UserId equals user.Id
+            orderby user.Email
+            select new PlatformAdminResponse(user.Id, user.Email ?? "")
+        ).ToListAsync();
+
+        return Results.Ok(rows);
     }
 
     private static async Task<IResult> Create(
@@ -41,6 +55,63 @@ public static class PlatformAdminEndpoints
         db.PlatformAdmins.Add(new PlatformAdmin { UserId = user.Id });
         await db.SaveChangesAsync();
         return Results.Created($"/platform-admins/{user.Id}", new CreatedPlatformAdminResponse(user.Id, user.Email ?? email));
+    }
+
+    private static async Task<IResult> Update(
+        string userId,
+        UpdatePlatformAdminRequest request,
+        UserManager<ApplicationUser> users,
+        WaterFlowDbContext db)
+    {
+        var email = request.Email?.Trim() ?? "";
+        var password = request.Password ?? "";
+        var changeEmail = email.Length > 0;
+        var changePassword = !string.IsNullOrWhiteSpace(password);
+        if (!changeEmail && !changePassword)
+            return Results.Json(new ErrorResponse("invalid_user"), statusCode: StatusCodes.Status400BadRequest);
+
+        if (!await db.PlatformAdmins.AnyAsync(admin => admin.UserId == userId))
+            return Results.NotFound();
+
+        var user = await users.FindByIdAsync(userId);
+        if (user is null)
+            return Results.NotFound();
+
+        if (changePassword)
+        {
+            foreach (var validator in users.PasswordValidators)
+            {
+                var valid = await validator.ValidateAsync(users, user, password);
+                if (!valid.Succeeded)
+                    return Results.Json(new ErrorResponse("invalid_password"), statusCode: StatusCodes.Status400BadRequest);
+            }
+        }
+
+        if (changeEmail && !string.Equals(user.Email, email, StringComparison.OrdinalIgnoreCase))
+        {
+            var byEmail = await users.FindByEmailAsync(email);
+            var byName = await users.FindByNameAsync(email);
+            if ((byEmail is not null && byEmail.Id != user.Id) || (byName is not null && byName.Id != user.Id))
+                return Results.Json(new ErrorResponse("email_in_use"), statusCode: StatusCodes.Status409Conflict);
+
+            var nameResult = await users.SetUserNameAsync(user, email);
+            if (!nameResult.Succeeded)
+                return Results.Json(new ErrorResponse("invalid_user"), statusCode: StatusCodes.Status400BadRequest);
+
+            var emailResult = await users.SetEmailAsync(user, email);
+            if (!emailResult.Succeeded)
+                return Results.Json(new ErrorResponse("email_in_use"), statusCode: StatusCodes.Status409Conflict);
+        }
+
+        if (changePassword)
+        {
+            var token = await users.GeneratePasswordResetTokenAsync(user);
+            var reset = await users.ResetPasswordAsync(user, token, password);
+            if (!reset.Succeeded)
+                return Results.Json(new ErrorResponse("invalid_password"), statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return Results.Ok(new PlatformAdminResponse(user.Id, user.Email ?? email));
     }
 
     private static async Task<IResult> Delete(
@@ -78,5 +149,9 @@ public static class PlatformAdminEndpoints
 }
 
 public sealed record CreatePlatformAdminRequest(string Email, string? Password);
+
+public sealed record UpdatePlatformAdminRequest(string? Email, string? Password);
+
+public sealed record PlatformAdminResponse(string UserId, string Email);
 
 public sealed record CreatedPlatformAdminResponse(string UserId, string Email);
