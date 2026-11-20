@@ -79,6 +79,23 @@ curl http://localhost:5080/hello
 curl http://localhost:5080/health
 ```
 
+## Web
+
+The login app lives in [web/](web/). It is a separate Vite project and is not part of the API image. Local sign-in does not use S3 or CloudFront.
+
+Start the API first, then the web app:
+
+```bash
+npm install --prefix web
+npm run dev --prefix web
+```
+
+The dev server listens on `http://localhost:5173`. The browser calls `/api` on that server. Vite forwards those requests to `http://localhost:5080` and strips the `/api` prefix, so `POST /api/auth/login` reaches `POST /auth/login`. Leave `VITE_API_BASE_URL` unset locally. It defaults to `/api`.
+
+Sign in with an existing account. Leave tenant id blank for a platform admin or an account with one membership. The app stores the JWT in `sessionStorage` and loads `GET /auth/me`. Log out clears that session. A refresh keeps the session until the token is missing or `/auth/me` returns 401.
+
+Deploy is a separate step. Build with `VITE_API_BASE_URL=/waterflow`, upload the `web/dist` files to a private S3 bucket, and serve them with CloudFront. Send `/waterflow/*` to the existing load balancer. This repository does not create that bucket or distribution.
+
 ## Tests
 
 ```bash

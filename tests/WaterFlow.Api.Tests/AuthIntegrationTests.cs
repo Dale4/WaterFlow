@@ -315,6 +315,125 @@ public class AuthIntegrationTests : IClassFixture<WaterFlowApiFactory>
         Assert.Equal(HttpStatusCode.Unauthorized, gone.StatusCode);
     }
 
+    [Fact]
+    public async Task PlatformAdmin_CanListUpdateAndDeleteTenantsAndMembers()
+    {
+        var adminEmail = $"directory-{Guid.NewGuid():N}@example.com";
+        var adminId = await CreatePlatformAdminAsync(adminEmail, Password);
+        var adminLogin = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(adminEmail, Password, null));
+        var admin = await adminLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(admin);
+
+        var listedAdmins = await SendAsync(HttpMethod.Get, "/platform-admins", admin.Token);
+        Assert.Equal(HttpStatusCode.OK, listedAdmins.StatusCode);
+        var admins = await listedAdmins.Content.ReadFromJsonAsync<List<PlatformAdminResponse>>();
+        Assert.Contains(admins!, item => item.UserId == adminId && item.Email == adminEmail);
+
+        var renamedEmail = $"renamed-{Guid.NewGuid():N}@example.com";
+        var otherEmail = $"other-admin-{Guid.NewGuid():N}@example.com";
+        await CreatePlatformAdminAsync(otherEmail, Password);
+        var duplicateEmail = await SendAsync(
+            HttpMethod.Patch,
+            $"/platform-admins/{adminId}",
+            admin.Token,
+            new UpdatePlatformAdminRequest(otherEmail, null));
+        Assert.Equal(HttpStatusCode.Conflict, duplicateEmail.StatusCode);
+        Assert.Equal("email_in_use", await ReadErrorAsync(duplicateEmail));
+
+        var renamed = await SendAsync(
+            HttpMethod.Patch,
+            $"/platform-admins/{adminId}",
+            admin.Token,
+            new UpdatePlatformAdminRequest(renamedEmail, "Next-pass-1"));
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+        var renamedLogin = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(renamedEmail, "Next-pass-1", null));
+        var renamedBody = await renamedLogin.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.NotNull(renamedBody);
+        Assert.Equal(AuthClaimTypes.PlatformAdmin, renamedBody.PlatformRole);
+
+        var tenantName = $"Cedar {Guid.NewGuid():N}";
+        var operatorEmail = $"cedar-op-{Guid.NewGuid():N}@example.com";
+        var create = await SendAsync(
+            HttpMethod.Post,
+            "/tenants",
+            renamedBody.Token,
+            new CreateTenantRequest(tenantName, operatorEmail, Password));
+        var created = await create.Content.ReadFromJsonAsync<CreatedTenantResponse>();
+        Assert.NotNull(created);
+
+        var secondName = $"Maple {Guid.NewGuid():N}";
+        var secondOperator = $"maple-op-{Guid.NewGuid():N}@example.com";
+        var second = await SendAsync(
+            HttpMethod.Post,
+            "/tenants",
+            renamedBody.Token,
+            new CreateTenantRequest(secondName, secondOperator, Password));
+        var secondTenant = await second.Content.ReadFromJsonAsync<CreatedTenantResponse>();
+        Assert.NotNull(secondTenant);
+
+        var sharedEmail = $"shared-{Guid.NewGuid():N}@example.com";
+        var shared = await SendAsync(
+            HttpMethod.Post,
+            $"/tenants/{secondTenant.TenantId}/users",
+            renamedBody.Token,
+            new CreateTenantUserRequest(sharedEmail, Password, nameof(MemberRole.Board)));
+        Assert.Equal(HttpStatusCode.Created, shared.StatusCode);
+        var sharedBody = await shared.Content.ReadFromJsonAsync<CreatedMemberResponse>();
+        Assert.NotNull(sharedBody);
+        await AddMembershipAsync(sharedBody.UserId, created.TenantId, tenantName, MemberRole.Homeowner);
+
+        var takenName = await SendAsync(
+            HttpMethod.Patch,
+            $"/tenants/{created.TenantId}",
+            renamedBody.Token,
+            new RenameTenantRequest(secondName));
+        Assert.Equal(HttpStatusCode.Conflict, takenName.StatusCode);
+        Assert.Equal("tenant_name_in_use", await ReadErrorAsync(takenName));
+
+        var nextName = $"Cedar West {Guid.NewGuid():N}";
+        var rename = await SendAsync(
+            HttpMethod.Patch,
+            $"/tenants/{created.TenantId}",
+            renamedBody.Token,
+            new RenameTenantRequest(nextName));
+        Assert.Equal(HttpStatusCode.OK, rename.StatusCode);
+
+        var membershipsResponse = await SendAsync(HttpMethod.Get, "/memberships", renamedBody.Token);
+        var memberships = await membershipsResponse.Content.ReadFromJsonAsync<List<MembershipResponse>>();
+        Assert.Equal(2, memberships!.Count(item => item.UserId == sharedBody.UserId));
+
+        var roleChange = await SendAsync(
+            HttpMethod.Patch,
+            $"/tenants/{secondTenant.TenantId}/users/{sharedBody.UserId}",
+            renamedBody.Token,
+            new UpdateMembershipRequest(nameof(MemberRole.BillingClerk)));
+        Assert.Equal(HttpStatusCode.NoContent, roleChange.StatusCode);
+        var asClerk = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(sharedEmail, Password, secondTenant.TenantId));
+        var clerk = await asClerk.Content.ReadFromJsonAsync<LoginResponse>();
+        Assert.Equal(nameof(MemberRole.BillingClerk), clerk!.Role);
+
+        var removedMembership = await SendAsync(
+            HttpMethod.Delete,
+            $"/tenants/{secondTenant.TenantId}/users/{sharedBody.UserId}",
+            renamedBody.Token);
+        Assert.Equal(HttpStatusCode.NoContent, removedMembership.StatusCode);
+        var stillShared = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(sharedEmail, Password, created.TenantId));
+        Assert.Equal(HttpStatusCode.OK, stillShared.StatusCode);
+
+        await AddMembershipAsync(adminId, created.TenantId, nextName, MemberRole.Operator);
+        var deleted = await SendAsync(HttpMethod.Delete, $"/tenants/{created.TenantId}", renamedBody.Token);
+        Assert.Equal(HttpStatusCode.NoContent, deleted.StatusCode);
+
+        var adminRemains = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(renamedEmail, "Next-pass-1", null));
+        Assert.Equal(HttpStatusCode.OK, adminRemains.StatusCode);
+        var operatorGone = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(operatorEmail, Password, null));
+        Assert.Equal(HttpStatusCode.Unauthorized, operatorGone.StatusCode);
+        var sharedGone = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(sharedEmail, Password, null));
+        Assert.Equal(HttpStatusCode.Unauthorized, sharedGone.StatusCode);
+        var secondRemains = await _client.PostAsJsonAsync("/auth/login", new LoginRequest(secondOperator, Password, null));
+        Assert.Equal(HttpStatusCode.OK, secondRemains.StatusCode);
+    }
+
     private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, string token, object? body = null)
     {
         var request = new HttpRequestMessage(method, path);
@@ -343,7 +462,8 @@ public class AuthIntegrationTests : IClassFixture<WaterFlowApiFactory>
     {
         await using var scope = _factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<WaterFlowDbContext>();
-        db.Tenants.Add(new Tenant { Id = tenantId, Name = tenantName });
+        if (!await db.Tenants.AnyAsync(item => item.Id == tenantId))
+            db.Tenants.Add(new Tenant { Id = tenantId, Name = tenantName });
         db.Memberships.Add(new Membership
         {
             Id = Guid.NewGuid(),
